@@ -66,6 +66,7 @@ class EventSource extends Stream<Event> {
     lastEventId = lastEventId ?? "";
     body = body ?? "";
     method = method ?? "GET";
+    print("Event connect ------ ${url}");
     EventSource es = new EventSource._internal(url, client, lastEventId, headers, body, method);
     await es._start();
     return es;
@@ -102,6 +103,7 @@ class EventSource extends Stream<Event> {
       request.body = _body;
 
       var response = await client.send(request);
+      print("response event ---- ${response.statusCode.toString()}");
       if (response.statusCode != 200) {
         // server returned an error
         var bodyBytes = await response.stream.toBytes();
@@ -111,8 +113,12 @@ class EventSource extends Stream<Event> {
       _readyState = EventSourceReadyState.OPEN;
       // start streaming the data
       response.stream.transform(_decoder).listen((Event event) {
-        _streamController.add(event);
-        _lastEventId = event.id;
+        print("Listen event ----");
+        if (!_streamController.isClosed) {
+          _streamController.add(event);
+          _lastEventId = event.id;
+        }
+
       },
           cancelOnError: true,
           onError: _retry,
@@ -121,7 +127,7 @@ class EventSource extends Stream<Event> {
 
           }
       );
-    } catch (e) {
+    } on Exception catch (e) {
       _retry(e);
       if (e is http.ClientException) {
         _retry(e);
@@ -131,9 +137,7 @@ class EventSource extends Stream<Event> {
   }
 
   Future cancelEventListen() async {
-
       _streamController.close();
-    // }
   }
 
   /// Retries until a new connection is established. Uses exponential backoff.
@@ -143,12 +147,16 @@ class EventSource extends Stream<Event> {
     Duration backoff = _retryDelay;
     while (true) {
       await new Future.delayed(backoff);
-      try {
-        await _start();
+      if (_streamController.isClosed) {
         break;
-      } catch (error) {
-        _streamController.addError(error);
-        backoff *= 2;
+      } else {
+        try {
+          await _start();
+          break;
+        } catch (error) {
+          _streamController.addError(error);
+          backoff *= 10;
+        }
       }
     }
   }
