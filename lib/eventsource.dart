@@ -137,7 +137,7 @@ class EventSource extends Stream<Event> {
   }
 
   Future cancelEventListen() async {
-      _streamController.close();
+      await _streamController.close();
   }
 
   /// Retries until a new connection is established. Uses exponential backoff.
