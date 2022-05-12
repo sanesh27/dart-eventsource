@@ -52,6 +52,7 @@ class EventSource extends Stream<Event> {
   http.Client client;
   Duration _retryDelay = const Duration(milliseconds: 3000);
   String _lastEventId;
+  Event _lastEvent;
   EventSourceDecoder _decoder;
   String _body;
   String _method;
@@ -67,6 +68,7 @@ class EventSource extends Stream<Event> {
     body = body ?? "";
     method = method ?? "GET";
     print("Event connect ------ ${url}");
+    print("Last Event Id----- $lastEventId");
     EventSource es = new EventSource._internal(url, client, lastEventId, headers, body, method);
     await es._start();
     return es;
@@ -86,7 +88,7 @@ class EventSource extends Stream<Event> {
   /// Attempt to start a new connection.
   Future _start() async {
     try {
-      _readyState = EventSourceReadyState.CONNECTING;
+      print("State before connection --- $_readyState");
       var request = new http.Request(_method, url);
       request.headers["Cache-Control"] = "no-cache";
       request.headers["Connection"] = "Keep-Alive";
@@ -101,8 +103,9 @@ class EventSource extends Stream<Event> {
         });
       }
       request.body = _body;
-
+      print("Send Event______");
       var response = await client.send(request);
+      print("response event ---- ${response.toString()}");
       print("response event ---- ${response.statusCode.toString()}");
       if (response.statusCode != 200) {
         // server returned an error
@@ -111,49 +114,79 @@ class EventSource extends Stream<Event> {
         throw new EventSourceSubscriptionException(response.statusCode, body);
       }
       _readyState = EventSourceReadyState.OPEN;
+      print("State after response --- $_readyState");
       // start streaming the data
       response.stream.transform(_decoder).listen((Event event) {
-        print("Listen event ----");
-        if (!_streamController.isClosed) {
-          _streamController.add(event);
-          _lastEventId = event.id;
+        print("Listen event ---- $_lastEventId");
+        if (_streamController != null) {
+          if (!_streamController.isClosed) {
+            // if (_lastEventId != event) {
+              _streamController.add(event);
+              _lastEvent = event;
+              _lastEventId = event.id;
+              print("Last Event Id----- $_lastEventId");
+            // }
+          }
         }
 
       },
           cancelOnError: true,
           onError: _retry,
           onDone: () {
+        print("Event done function..");
             _readyState = EventSourceReadyState.CLOSED;
 
           }
       );
     } on Exception catch (e) {
-      _retry(e);
+      cancelEventListen();
+      print("State on exception --- $_readyState");
+      print("Exception --- $e");
       if (e is http.ClientException) {
-        _retry(e);
+        print("Exception http--- $e");
       }
     }
 
   }
 
   Future cancelEventListen() async {
-      await _streamController.close();
+    print("Cancel Event_____");
+    try {
+      if (_streamController != null) {
+        if (_streamController.isPaused) {
+          print("Pause event--- ${_streamController.isPaused}");
+          _streamController = new StreamController<Event>.broadcast();
+        }
+        else {
+          print("Close stream____");
+          await _streamController.close();
+        }
+      }
+    _streamController = null;
+    Future.delayed(Duration(seconds: 3), () => client.close());
+      } catch(e) {
+      print("exception $e");
+    }
+
   }
 
   /// Retries until a new connection is established. Uses exponential backoff.
   Future _retry(dynamic e) async {
+    print("Retry Event______");
     _readyState = EventSourceReadyState.CONNECTING;
     // try reopening with exponential backoff
     Duration backoff = _retryDelay;
     while (true) {
       await new Future.delayed(backoff);
-      if (_streamController.isClosed) {
+      if (_streamController.isClosed || _streamController.isPaused) {
+        print("Retry pause check_____");
         break;
       } else {
         try {
           await _start();
           break;
         } catch (error) {
+          print("Retry backoff_____");
           _streamController.addError(error);
           backoff *= 10;
         }
