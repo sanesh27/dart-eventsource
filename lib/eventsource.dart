@@ -34,7 +34,7 @@ class EventSource extends Stream<Event> {
   // interface attributes
 
   final Uri url;
-  final Map headers;
+  final Map? headers;
 
   EventSourceReadyState get readyState => _readyState;
 
@@ -44,23 +44,23 @@ class EventSource extends Stream<Event> {
 
   // internal attributes
 
-  StreamController<Event> _streamController =
+  StreamController<Event>? _streamController =
       new StreamController<Event>.broadcast();
 
   EventSourceReadyState _readyState = EventSourceReadyState.CLOSED;
 
   http.Client client;
   Duration _retryDelay = const Duration(milliseconds: 3000);
-  String _lastEventId;
-  Event _lastEvent;
-  EventSourceDecoder _decoder;
+  String? _lastEventId;
+  Event? _lastEvent;
+  late EventSourceDecoder _decoder;
   String _body;
   String _method;
 
 
   /// Create a new EventSource by connecting to the specified url.
   static Future<EventSource> connect(url,
-      {http.Client client, String lastEventId, Map headers, String body, String method}) async {
+      {http.Client? client, String? lastEventId, Map? headers, String? body, String? method}) async {
     // parameter initialization
     url = url is Uri ? url : Uri.parse(url);
     client = client ?? new http.Client();
@@ -80,9 +80,9 @@ class EventSource extends Stream<Event> {
 
   // proxy the listen call to the controller's listen call
   @override
-  StreamSubscription<Event> listen(void onData(Event event),
-          {Function onError, void onDone(), bool cancelOnError}) =>
-      _streamController.stream.listen(onData,
+  StreamSubscription<Event> listen(void onData(Event event)?,
+          {Function? onError, void onDone()?, bool? cancelOnError}) =>
+      _streamController!.stream.listen(onData,
           onError: onError, onDone: onDone, cancelOnError: cancelOnError);
 
   /// Attempt to start a new connection.
@@ -94,11 +94,11 @@ class EventSource extends Stream<Event> {
       request.headers["Connection"] = "Keep-Alive";
       request.headers["Accept"] = "text/event-stream";
       request.headers["Content-type"] = "application/json";
-      if (_lastEventId.isNotEmpty) {
-        request.headers["Last-Event-ID"] = _lastEventId;
+      if (_lastEventId!.isNotEmpty) {
+        request.headers["Last-Event-ID"] = _lastEventId!;
       }
       if (headers != null) {
-        headers.forEach((k,v) {
+        headers!.forEach((k,v) {
           request.headers[k] = v;
         });
       }
@@ -119,9 +119,9 @@ class EventSource extends Stream<Event> {
       response.stream.transform(_decoder).listen((Event event) {
         print("Listen event ---- $_lastEventId");
         if (_streamController != null) {
-          if (!_streamController.isClosed) {
+          if (!_streamController!.isClosed) {
             // if (_lastEventId != event) {
-              _streamController.add(event);
+              _streamController!.add(event);
               _lastEvent = event;
               _lastEventId = event.id;
               print("Last Event Id----- $_lastEventId");
@@ -153,13 +153,13 @@ class EventSource extends Stream<Event> {
     print("Cancel Event_____");
     try {
       if (_streamController != null) {
-        if (_streamController.isPaused) {
-          print("Pause event--- ${_streamController.isPaused}");
+        if (_streamController!.isPaused) {
+          print("Pause event--- ${_streamController!.isPaused}");
           _streamController = new StreamController<Event>.broadcast();
         }
         else {
           print("Close stream____");
-          await _streamController.close();
+          await _streamController!.close();
         }
       }
     _streamController = null;
@@ -178,7 +178,7 @@ class EventSource extends Stream<Event> {
     Duration backoff = _retryDelay;
     while (true) {
       await new Future.delayed(backoff);
-      if (_streamController.isClosed || _streamController.isPaused) {
+      if (_streamController!.isClosed || _streamController!.isPaused) {
         print("Retry pause check_____");
         break;
       } else {
@@ -187,7 +187,7 @@ class EventSource extends Stream<Event> {
           break;
         } catch (error) {
           print("Retry backoff_____");
-          _streamController.addError(error);
+          _streamController!.addError(error);
           backoff *= 10;
         }
       }

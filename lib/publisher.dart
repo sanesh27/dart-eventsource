@@ -15,8 +15,8 @@ import "src/proxy_sink.dart";
 /// a web server, use this together with [shelf_eventsource] or another server
 /// implementation.
 class EventSourcePublisher extends Sink<Event> {
-  log.Logger logger;
-  EventCache _cache;
+  log.Logger? logger;
+  EventCache? _cache;
 
   /// Create a new EventSource server.
   ///
@@ -38,7 +38,7 @@ class EventSourcePublisher extends Sink<Event> {
     }
   }
 
-  Map<String, List<ProxySink>> _subsByChannel = {};
+  Map<String?, List<ProxySink>> _subsByChannel = {};
 
   /// Creates a Sink for the specified channel.
   /// The `add` and `remove` methods of this channel are equivalent to the
@@ -52,7 +52,7 @@ class EventSourcePublisher extends Sink<Event> {
   @override
   void add(Event event, {Iterable<String> channels: const [""]}) {
     for (String channel in channels) {
-      List subs = _subsByChannel[channel];
+      List? subs = _subsByChannel[channel];
       if (subs == null) {
         continue;
       }
@@ -63,7 +63,7 @@ class EventSourcePublisher extends Sink<Event> {
       }
     }
     if (_cache != null) {
-      _cache.add(event, channels);
+      _cache!.add(event, channels);
     }
   }
 
@@ -71,9 +71,9 @@ class EventSourcePublisher extends Sink<Event> {
   /// All the connections with the subscribers to this channels will be closed.
   /// By default only closes the default channel.
   @override
-  void close({Iterable<String> channels: const [""]}) {
-    for (String channel in channels) {
-      List subs = _subsByChannel[channel];
+  void close({Iterable<String?> channels: const [""]}) {
+    for (String? channel in channels) {
+      List? subs = _subsByChannel[channel];
       if (subs == null) {
         continue;
       }
@@ -83,7 +83,7 @@ class EventSourcePublisher extends Sink<Event> {
       }
     }
     if (_cache != null) {
-      _cache.clear(channels);
+      _cache!.clear(channels);
     }
   }
 
@@ -93,10 +93,10 @@ class EventSourcePublisher extends Sink<Event> {
   /// Initialize a new subscription and replay when possible.
   /// Should not be used by the user directly.
   void newSubscription(
-      {Function onEvent,
-      Function onClose,
-      String channel,
-      String lastEventId}) {
+      {Function? onEvent,
+      Function? onClose,
+      String? channel,
+      String? lastEventId}) {
     _logFine("New subscriber on channel $channel.");
     // create a sink for the subscription
     ProxySink<Event> sub = new ProxySink(onAdd: onEvent, onClose: onClose);
@@ -106,26 +106,26 @@ class EventSourcePublisher extends Sink<Event> {
     if (_cache != null && lastEventId != null) {
       scheduleMicrotask(() {
         _logFine("Replaying events on channel $channel from id $lastEventId.");
-        _cache.replay(sub, lastEventId, channel);
+        _cache!.replay(sub, lastEventId, channel);
       });
     }
   }
 
   void _logInfo(message) {
     if (logger != null) {
-      logger.log(log.Level.INFO, message);
+      logger!.log(log.Level.INFO, message);
     }
   }
 
   void _logFine(message) {
     if (logger != null) {
-      logger.log(log.Level.FINE, message);
+      logger!.log(log.Level.FINE, message);
     }
   }
 
   void _logFiner(message) {
     if (logger != null) {
-      logger.log(log.Level.FINER, message);
+      logger!.log(log.Level.FINER, message);
     }
   }
 }
