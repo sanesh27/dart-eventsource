@@ -21,7 +21,7 @@ void main() {
     test("vectors", () {
       var encoder = new EventSourceEncoder();
       for (Event event in _VECTORS.keys) {
-        var encoded = _VECTORS[event];
+        var encoded = _VECTORS[event]!;
         expect(encoder.convert(event), equals(utf8.encode(encoded)));
       }
     });
@@ -39,7 +39,7 @@ void main() {
           expect(decodedEvent.id, equals(event.id));
           expect(decodedEvent.event, equals(event.event));
           expect(decodedEvent.data, equals(event.data));
-        }, count: 1));
+        }, count: 1) as void Function(Event)?);
       }
     });
     test("pass retry value", () async {
@@ -51,12 +51,12 @@ void main() {
       }, count: 1);
       var stream = new Stream.fromIterable([encodedWithRetry])
           .transform(new Utf8Encoder())
-          .transform(new EventSourceDecoder(retryIndicator: changeRetryValue));
+          .transform(new EventSourceDecoder(retryIndicator: changeRetryValue as void Function(Duration)?));
       stream.listen(expectAsync((decodedEvent) {
         expect(decodedEvent.id, equals(event.id));
         expect(decodedEvent.event, equals(event.event));
         expect(decodedEvent.data, equals(event.data));
-      }, count: 1));
+      }, count: 1) as void Function(Event)?);
     });
   });
 }
